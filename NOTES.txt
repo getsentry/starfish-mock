@@ -1,0 +1,5 @@
+# Questions
+
+* Do we want to count number of spans in a segment and move them up as
+  counters to the segment?  eg: `db.query` 4x = counter of
+  `db.query.query.counter: 4`
