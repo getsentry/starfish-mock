@@ -58,8 +58,6 @@ for batch_id, batch in data["batches"].items():
             aggregator.setdefault(aggregator_key, []).append(span["measurements"][key])
 
 
-import json
-
 data["metrics"] = [
     {"metric": x[0][0], "tags": dict(sorted(x[0][1])), "values": x[1]}
     for x in sorted(aggregator.items())
