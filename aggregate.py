@@ -4,14 +4,21 @@ import json
 data = json.load(sys.stdin)
 
 
+# Tags that propagate from a segment to individual spans
+PROPAGATION_TAGS = ["release", "environment", "transaction"]
+
+# Tags that should be indexed
+INDEXED_TAGS = ["db.operation", "db.statement"] + PROPAGATION_TAGS
+
+# Measurement that get indexed
+INDEXED_MEASUREMENTS = ["db.rows_returned", "duration"]
+
+aggregator = {}
+
+
 def clean(description):
     return description
 
-
-PROPAGATION_TAGS = ["release", "environment", "transaction"]
-AGGREGATION_KEYS = ["db.operation", "db.statement"]
-
-aggregator = {}
 
 for batch_id, batch in data["batches"].items():
     if batch_id:
@@ -28,6 +35,7 @@ for batch_id, batch in data["batches"].items():
         tags["op"] = span["tags"]["op"]
         tags["cleaned_description"] = clean(span["description"])
 
+        merged_tags = dict(span["tags"])
         if segment is not None:
             counter_key = span["tags"]["op"] + ".counter"
             segment_measurements = segment.setdefault("measurements", {})
@@ -35,19 +43,19 @@ for batch_id, batch in data["batches"].items():
                 segment_measurements.get(counter_key) or 0
             ) + 1
 
-            for aggr in PROPAGATION_TAGS:
-                if aggr in segment["tags"]:
-                    tags[aggr] = segment["tags"][aggr]
+            for tag in PROPAGATION_TAGS:
+                if tag in segment["tags"]:
+                    merged_tags.setdefault(tag, segment["tags"][tag])
 
-        for aggr in AGGREGATION_KEYS:
-            if aggr in span["tags"]:
-                tags[aggr] = span["tags"][aggr]
+        for tag in INDEXED_TAGS:
+            if tag in merged_tags:
+                tags[tag] = merged_tags[tag]
 
-        key = "span.duration"
-        aggregator_key = (key, tuple(sorted(tags.items())))
-        aggregator.setdefault(aggregator_key, []).append(
-            span["measurements"]["duration"]
-        )
+        for key in INDEXED_MEASUREMENTS:
+            if key not in span["measurements"]:
+                continue
+            aggregator_key = (key, tuple(sorted(tags.items())))
+            aggregator.setdefault(aggregator_key, []).append(span["measurements"][key])
 
 
 import json
